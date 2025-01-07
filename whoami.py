@@ -20,7 +20,7 @@ def get_user_info(profile_name="DEFAULT"):
 
         # Create an IdentityClient
         identity_client = oci.identity.IdentityClient(config)
-
+        #print(f"config is {config}")
         # Get the user information
         user = identity_client.get_user(config["user"]).data
 

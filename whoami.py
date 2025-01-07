@@ -1,34 +1,50 @@
 import oci
 import sys
 import json
+import os
+
 
 def get_user_info(profile_name="DEFAULT"):
     """
     Retrieves user information from the specified OCI profile and returns it as a JSON object.
 
     Args:
-      profile_name: The name of the profile in the OCI config file. 
+      profile_name: The name of the profile in the OCI config file.
                      Defaults to "DEFAULT".
 
     Returns:
-      A JSON object containing the user information (name and OCID), or an error message 
+      A JSON object containing the user information (name and OCID), or an error message
       if an exception occurs.
     """
     try:
         # Load configuration from the specified profile
         config = oci.config.from_file(profile_name=profile_name)
 
+        # Check for authentication_type
+        if "authentication_type" in config and config["authentication_type"] == "instance_principal":
+            # Use OCI_CS_USER_OCID from environment variables if available
+            user_ocid = os.getenv("OCI_CS_USER_OCID")
+            if not user_ocid:
+                raise ValueError("OCI_CS_USER_OCID environment variable is not set for instance_principal.")
+        else:
+            # Use the user from the configuration
+            user_ocid = config["user"]
+
+        # Get the user agent from environment variables
+        user_agent = os.getenv("OCI_SDK_APPEND_USER_AGENT", "local")
+
         # Create an IdentityClient
         identity_client = oci.identity.IdentityClient(config)
-        #print(f"config is {config}")
+
         # Get the user information
-        user = identity_client.get_user(config["user"]).data
+        user = identity_client.get_user(user_ocid).data
 
         # Create a dictionary with the user information
         user_info = {
             "profile_name": profile_name,
             "user_name": user.name,
-            "ocid": user.id
+            "ocid": user.id,
+            "user_agent": user_agent,
         }
 
         # Return the user information as a JSON object
@@ -38,6 +54,7 @@ def get_user_info(profile_name="DEFAULT"):
         return json.dumps({"error": f"Profile '{profile_name}' not found."})
     except Exception as e:
         return json.dumps({"error": f"An error occurred: {e}"})
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
